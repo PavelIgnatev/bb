@@ -44,6 +44,20 @@ const callManager = {
   callback_data: JSON.stringify({ status: "communicate_call" }, null, 2),
 };
 
+async function wrapPromise(promiseFn) {
+  while (true) {
+    try {
+      console.log("Вызываю функцию", promiseFn.toString());
+      return await promiseFn();
+    } catch (e) {
+      console.log(
+        `Произошла ошибка в функции ${promiseFn.toString()}: ${e.message}`
+      );
+      await new Promise((res) => setTimeout(res, 2500));
+    }
+  }
+}
+
 const generateDatePicker = () => {
   const currentDate = new Date();
   const daysInTwoWeeks = 14;
@@ -140,42 +154,50 @@ const inlineKeyboardStatus = (status, text) => [
 ];
 
 const clearKeyBoard = (chatId, messageId, addMarkup) =>
-  bot.editMessageReplyMarkup(
-    {
-      inline_keyboard: addMarkup ?? [],
-    },
-    {
-      chat_id: chatId,
-      message_id: messageId,
-    }
+  wrapPromise(() =>
+    bot.editMessageReplyMarkup(
+      {
+        inline_keyboard: addMarkup ?? [],
+      },
+      {
+        chat_id: chatId,
+        message_id: messageId,
+      }
+    )
   );
 
 const editMessageText = (chatId, messageId, newText) =>
-  bot.editMessageText(newText, {
-    chat_id: chatId,
-    message_id: messageId,
-  });
-
-const toStatus = (chatId, messageId, status) =>
-  bot.emit("callback_query", {
-    message: {
-      chat: { id: chatId },
+  wrapPromise(() =>
+    bot.editMessageText(newText, {
+      chat_id: chatId,
       message_id: messageId,
-    },
-    data: JSON.stringify({ status }, null, 2),
-  });
+    })
+  );
+
+const toStatus = (chatId, messageId, status, first_name, last_name, username) =>
+  wrapPromise(() =>
+    bot.emit("callback_query", {
+      message: {
+        chat: { id: chatId, first_name, last_name, username },
+        message_id: messageId,
+      },
+      data: JSON.stringify({ status }, null, 2),
+    })
+  );
 
 const sendVideoToUser = async (chatId, filename, inlineKeyboard) => {
   try {
     const videoPath = path.join(__dirname, "videos", filename);
     const videoContent = await fs.promises.readFile(videoPath);
 
-    const sentVideo = await bot.sendVideo(chatId, videoContent, {
-      filename,
-      reply_markup: {
-        inline_keyboard: inlineKeyboard,
-      },
-    });
+    const sentVideo = await wrapPromise(() =>
+      bot.sendVideo(chatId, videoContent, {
+        filename,
+        reply_markup: {
+          inline_keyboard: inlineKeyboard,
+        },
+      })
+    );
 
     return sentVideo.message_id;
   } catch (error) {
@@ -189,9 +211,11 @@ const sendToChannel = async (messageText) => {
   try {
     const channelInfo = await bot.getChat("@autoaicheck");
 
-    await bot.sendMessage(channelInfo.id, messageText, {
-      parse_mode: "HTML",
-    });
+    await wrapPromise(() =>
+      bot.sendMessage(channelInfo.id, messageText, {
+        parse_mode: "HTML",
+      })
+    );
   } catch (error) {
     console.error("Ошибка отправки сообщения в канал:", error.message);
   }
@@ -251,14 +275,14 @@ bot.onText(/\/start/, async (msg) => {
     const hiRustamMessage = `А пока что я предлагаю познакомиться. На связи Рустам - один из основателей компании AiSender.
     
 Приятного просмотра!`;
-    const channelMessage = `✅ ЗАПУСК ВОРОНКИ ✅
+    const channelMessage = `🚀 ЗАПУСК ВОРОНКИ 🚀
   
 ID: ${msg.chat.id}
 Имя: ${msg.chat.first_name} ${msg.chat.last_name ? msg.chat.last_name : ""}
 Ссылка: @${msg.chat.username}`;
 
-    await bot.sendMessage(chatId, hiMessage);
-    await bot.sendMessage(chatId, hiRustamMessage);
+    await wrapPromise(() => bot.sendMessage(chatId, hiMessage));
+    await wrapPromise(() => bot.sendMessage(chatId, hiRustamMessage));
 
     const newMessageID = await sendVideoToUser(
       chatId,
@@ -273,7 +297,14 @@ ID: ${msg.chat.id}
       const status = getCurrentStatus(msg.chat.id);
 
       if (status && status === "started") {
-        toStatus(chatId, newMessageID, "second");
+        toStatus(
+          chatId,
+          newMessageID,
+          "second",
+          msg.chat.first_name,
+          msg.chat.last_name,
+          msg.chat.username
+        );
       }
     }, 120000);
   } catch {}
@@ -285,12 +316,10 @@ bot.on("callback_query", async (callbackQuery) => {
   const parsedCallbackData = JSON.parse(callbackQuery.data);
   const callbackStatus = parsedCallbackData.status;
 
-  console.log(parsedCallbackData);
-
   try {
     switch (callbackStatus) {
       case "second":
-        await bot.sendMessage(chatId, secondMessage);
+        await wrapPromise(() => bot.sendMessage(chatId, secondMessage));
         await clearKeyBoard(chatId, messageId);
         const newMessageID = await sendVideoToUser(
           chatId,
@@ -303,14 +332,21 @@ bot.on("callback_query", async (callbackQuery) => {
           const status = getCurrentStatus(callbackQuery.message.chat.id);
 
           if (status && status === "second_video") {
-            toStatus(chatId, newMessageID, "third");
+            toStatus(
+              chatId,
+              newMessageID,
+              "third",
+              callbackQuery.message.chat.first_name,
+              callbackQuery.message.chat.last_name,
+              callbackQuery.message.chat.username
+            );
           }
         }, 240000);
 
         break;
 
       case "third":
-        await bot.sendMessage(chatId, thirdMessage);
+        await wrapPromise(() => bot.sendMessage(chatId, thirdMessage));
         await clearKeyBoard(chatId, messageId);
         const newMessageThirdID = await sendVideoToUser(
           chatId,
@@ -323,20 +359,29 @@ bot.on("callback_query", async (callbackQuery) => {
           const status = getCurrentStatus(callbackQuery.message.chat.id);
 
           if (status && status === "third_video") {
-            toStatus(chatId, newMessageThirdID, "final");
+            toStatus(
+              chatId,
+              newMessageThirdID,
+              "final",
+              callbackQuery.message.chat.first_name,
+              callbackQuery.message.chat.last_name,
+              callbackQuery.message.chat.username
+            );
           }
-        }, 120000);
+        }, 30000);
         break;
 
       case "final":
-        await bot.sendMessage(chatId, finalMessage, {
-          reply_markup: {
-            inline_keyboard: [[connectionManager, callManager]],
-          },
-        });
+        await wrapPromise(() =>
+          bot.sendMessage(chatId, finalMessage, {
+            reply_markup: {
+              inline_keyboard: [[connectionManager, callManager]],
+            },
+          })
+        );
         await clearKeyBoard(chatId, messageId);
         writeUsernameToFile(callbackQuery.message.chat.id, "finished");
-        sendToChannel(`🆘 ВОРОНКА ПРОЙДЕНА 🆘
+        sendToChannel(`✅ ВОРОНКА ПРОЙДЕНА ✅
 
 ID: ${callbackQuery.message.chat.id}
 Имя: ${callbackQuery.message.chat.first_name} ${
@@ -349,11 +394,13 @@ ID: ${callbackQuery.message.chat.id}
         break;
 
       case "communicate_manager":
-        await bot.sendMessage(chatId, communicationManagerlMessage, {
-          reply_markup: {
-            inline_keyboard: [[callManager]],
-          },
-        });
+        await wrapPromise(() =>
+          bot.sendMessage(chatId, communicationManagerlMessage, {
+            reply_markup: {
+              inline_keyboard: [[callManager]],
+            },
+          })
+        );
         await clearKeyBoard(chatId, messageId, [[callManager]]);
 
         writeUsernameToFile(
@@ -361,7 +408,7 @@ ID: ${callbackQuery.message.chat.id}
           "communicate_manager"
         );
 
-        sendToChannel(`💰 ЗАПРОС НА ОБЩЕНИЕ 💰
+        sendToChannel(`💬 ЗАПРОС НА ОБЩЕНИЕ 💬
   
 ID: ${callbackQuery.message.chat.id}
 Имя: ${callbackQuery.message.chat.first_name} ${
@@ -406,7 +453,7 @@ ID: ${callbackQuery.message.chat.id}
             callbackQuery.message.chat.id,
             "communicate_zoom"
           );
-          sendToChannel(`💰 ЗАПРОС НА ВСТРЕЧУ 💰
+          sendToChannel(`☎️ ЗАПРОС НА ВСТРЕЧУ ☎️
 
 Дата: ${parsedCallbackData.date}/${parsedCallbackData.time}
 ID: ${callbackQuery.message.chat.id}
