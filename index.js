@@ -212,10 +212,11 @@ const writeUsernameToFile = (id, status) => {
 
   const existingUserIndex = users.findIndex((user) => user.id === id);
 
-  if (existingUserIndex !== -1) {
+  if (existingUserIndex !== -1 && users[existingUserIndex]) {
     users[existingUserIndex].status = status;
+    users[existingUserIndex].dateUpdated = new Date();
   } else {
-    users.push({ id, status });
+    users.push({ id, status, dateCreated: new Date() });
   }
 
   try {
