@@ -454,6 +454,17 @@ ID: ${callbackQuery.message.chat.id}
             messageId,
             generateTimeSubMenu(parsedCallbackData.date)
           );
+
+          sendToChannel(`🗓️ ВЫБРАЛ ДЕНЬ ВСТРЕЧИ 🗓️
+
+День: ${parsedCallbackData.date}
+ID: ${callbackQuery.message.chat.id}
+Имя: ${callbackQuery.message.chat.first_name} ${
+            callbackQuery.message.chat.last_name
+              ? callbackQuery.message.chat.last_name
+              : ""
+          }
+Ссылка: @${callbackQuery.message.chat.username}`);
         } else {
           await clearKeyBoard(chatId, messageId);
           await editMessageText(
@@ -478,8 +489,7 @@ ID: ${callbackQuery.message.chat.id}
               ? callbackQuery.message.chat.last_name
               : ""
           }
-Ссылка: @${callbackQuery.message.chat.username}
-      `);
+Ссылка: @${callbackQuery.message.chat.username}`);
         }
 
         break;
