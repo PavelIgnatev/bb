@@ -45,15 +45,24 @@ const callManager = {
 };
 
 async function wrapPromise(promiseFn) {
+  let i = 0;
+
   while (true) {
     try {
       console.log("Вызываю функцию", promiseFn.toString());
       return await promiseFn();
     } catch (e) {
       console.log(
-        `Произошла ошибка в функции ${promiseFn.toString()}: ${e.message}`
+        `Произошла ошибка в функции ${promiseFn.toString()}: ${
+          e.message
+        }; Итерация ${i}`
       );
       await new Promise((res) => setTimeout(res, 2500));
+      i++;
+
+      if (i > 10) {
+        return await promiseFn();
+      }
     }
   }
 }
@@ -307,7 +316,9 @@ ID: ${msg.chat.id}
         );
       }
     }, 120000);
-  } catch {}
+  } catch {
+    console.error("Ошибка отправки /start:", error.message);
+  }
 });
 
 bot.on("callback_query", async (callbackQuery) => {
