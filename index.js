@@ -25,22 +25,22 @@ const finalMessage = `Спасибо за то, что познакомилис�
 
 Выберите, пожалуйста, дальнейшее действие:`;
 const communicationManagerlMessage = `
-Я передал ваше желание о общении нашему специалисту по работе с клиентами, в ближайшее время он свяжется с вами.
+Я передал ваш контакт нашему специалисту по работе с клиентами, в ближайшее время он свяжется с вами.
                     
 Если Вы хотите ускорить данный процесс, просто напишите нашему специалисту - @nazar_mlc.
 
-⬇️ Вы все еще можете записаться на встречу ⬇️`;
+⬇️ Вы все еще можете записаться на встречу с представителем AiSender ⬇️`;
 const communicationZoomDateMessage = `
 Пожалуйста, выберите ДЕНЬ, когда Вам было бы действительно удобно провести встречу. (MSK, UTC+3)`;
 const communicationZoomTimeMessage = `
 Пожалуйста, выберите ВРЕМЯ, когда Вам было бы действительно удобно провести встречу. (MSK, UTC+3)`;
 
 const connectionManager = {
-  text: "СВЯЖИТЕСЬ СО МНОЙ",
+  text: "СВЯЗАТЬСЯ",
   callback_data: JSON.stringify({ status: "communicate_manager" }, null, 2),
 };
 const callManager = {
-  text: "ЗАПИСАТЬСЯ НА ВСТРЕЧУ",
+  text: "ЗАПИСАТЬСЯ",
   callback_data: JSON.stringify({ status: "communicate_call" }, null, 2),
 };
 
@@ -60,9 +60,9 @@ async function wrapPromise(promiseFn) {
 
 const generateDatePicker = () => {
   const currentDate = new Date();
-  const daysInTwoWeeks = 14;
+  const daysInTwoWeeks = 9;
   const inlineKeyboard = [];
-  let currentWeek = [];
+  let currentRow = [];
 
   for (let day = 0; day < daysInTwoWeeks; day++) {
     const date = new Date(currentDate);
@@ -80,11 +80,11 @@ const generateDatePicker = () => {
       }),
     };
 
-    currentWeek.push(dateButton);
+    currentRow.push(dateButton);
 
-    if ((day + 1) % 7 === 0 || day === daysInTwoWeeks - 1) {
-      inlineKeyboard.push([...currentWeek]);
-      currentWeek = [];
+    if (currentRow.length === 3 || day === daysInTwoWeeks - 1) {
+      inlineKeyboard.push([...currentRow]);
+      currentRow = [];
     }
   }
 
@@ -341,7 +341,7 @@ bot.on("callback_query", async (callbackQuery) => {
               callbackQuery.message.chat.username
             );
           }
-        }, 240000);
+        }, 150000);
 
         break;
 
@@ -372,7 +372,7 @@ bot.on("callback_query", async (callbackQuery) => {
         break;
 
       case "final":
-        await wrapPromise(() =>
+        const newMessageFinalID = await wrapPromise(() =>
           bot.sendMessage(chatId, finalMessage, {
             reply_markup: {
               inline_keyboard: [[connectionManager, callManager]],
@@ -391,6 +391,21 @@ ID: ${callbackQuery.message.chat.id}
         }
 Ссылка: @${callbackQuery.message.chat.username}
 `);
+
+        setTimeout(() => {
+          const status = getCurrentStatus(callbackQuery.message.chat.id);
+
+          if (status && status === "finished") {
+            toStatus(
+              chatId,
+              newMessageFinalID.message_id,
+              "communicate_manager",
+              callbackQuery.message.chat.first_name,
+              callbackQuery.message.chat.last_name,
+              callbackQuery.message.chat.username
+            );
+          }
+        }, 60000);
         break;
 
       case "communicate_manager":
@@ -401,6 +416,7 @@ ID: ${callbackQuery.message.chat.id}
             },
           })
         );
+
         await clearKeyBoard(chatId, messageId, [[callManager]]);
 
         writeUsernameToFile(
