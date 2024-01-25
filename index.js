@@ -21,26 +21,18 @@ const secondMessage = `Приятно познакомиться, идем да�
 const thirdMessage = `А вот и результат!
 
 Переходим к финальному видео - применению AISender в проектах наших заказчиков`;
-const finalMessage = `Спасибо за то, что познакомились с нами!
+const finalMessage = `Благодарим вас за ознакомление с нашим продуктом.
 
-Выберите, пожалуйста, дальнейшее действие:`;
-const communicationManagerlMessage = `
-Я передал ваш контакт нашему специалисту по работе с клиентами, в ближайшее время он свяжется с вами.
-                    
-Если Вы хотите ускорить данный процесс, просто напишите нашему специалисту - @nazar_mlc.
+Специалист AiSender в скором времени свяжется с вами для обсуждения того, как наше решение сможет помочь Вам в привлечении потенциальных клиентов.
 
-⬇️ Вы все еще можете записаться на встречу с представителем AiSender ⬇️`;
+Однако, если вы уже готовы, вы можете самостоятельно назначить встречу прямо сейчас, нажав на кнопку "ЗАПИСАТЬСЯ НА ВСТРЕЧУ".`;
 const communicationZoomDateMessage = `
-Пожалуйста, выберите ДЕНЬ, когда Вам было бы действительно удобно провести встречу. (MSK, UTC+3)`;
+Пожалуйста, выберите ДЕНЬ для проведения встречи. (MSK, UTC+3)`;
 const communicationZoomTimeMessage = `
-Пожалуйста, выберите ВРЕМЯ, когда Вам было бы действительно удобно провести встречу. (MSK, UTC+3)`;
+Пожалуйста, выберите ВРЕМЯ для проведения встречи. (MSK, UTC+3)`;
 
-const connectionManager = {
-  text: "СВЯЗАТЬСЯ",
-  callback_data: JSON.stringify({ status: "communicate_manager" }, null, 2),
-};
 const callManager = {
-  text: "ЗАПИСАТЬСЯ",
+  text: "ЗАПИСАТЬСЯ НА ВСТРЕЧУ",
   callback_data: JSON.stringify({ status: "communicate_call" }, null, 2),
 };
 
@@ -77,7 +69,7 @@ const generateDatePicker = () => {
     const date = new Date(currentDate);
     date.setDate(currentDate.getDate() + day);
 
-    if (day === 0 && date.getHours() >= 17) {
+    if (day === 0 && date.getHours() >= 15) {
       continue;
     }
 
@@ -105,7 +97,7 @@ const generateTimeSubMenu = (date) => {
   const currentDate = new Date();
   const currentHour = currentDate.getHours();
 
-  for (let hour = 9; hour < 20; hour += 2) {
+  for (let hour = 9; hour < 18; hour += 2) {
     const row = [];
 
     for (let i = 0; i < 2; i++) {
@@ -219,7 +211,6 @@ const sendVideoToUser = async (chatId, filename, inlineKeyboard) => {
 const sendToChannel = async (messageText) => {
   try {
     const channelInfo = await bot.getChat("@autoaicheck");
-
     await wrapPromise(() =>
       bot.sendMessage(channelInfo.id, messageText, {
         parse_mode: "HTML",
@@ -280,7 +271,7 @@ bot.onText(/\/start/, async (msg) => {
 
 Ранее с вами связался сотрудник компании AiSender, которого, на самом деле, не существует.
 
-Это один из наших менеджров, которого мы наделили возможностью общаться с использованием технологии искусственного интеллекта. Немного позднее мы подробно расскажем о том, как это работает.`;
+Это один из наших менеджеров, которого мы наделили возможностью общаться с использованием технологии искусственного интеллекта. Немного позднее мы подробно расскажем о том, как это работает.`;
     const hiRustamMessage = `А пока что я предлагаю познакомиться. На связи Рустам - один из основателей компании AiSender.
     
 Приятного просмотра!`;
@@ -379,14 +370,14 @@ bot.on("callback_query", async (callbackQuery) => {
               callbackQuery.message.chat.username
             );
           }
-        }, 30000);
+        }, 20000);
         break;
 
       case "final":
-        const newMessageFinalID = await wrapPromise(() =>
+        await wrapPromise(() =>
           bot.sendMessage(chatId, finalMessage, {
             reply_markup: {
-              inline_keyboard: [[connectionManager, callManager]],
+              inline_keyboard: [[callManager]],
             },
           })
         );
@@ -403,48 +394,6 @@ ID: ${callbackQuery.message.chat.id}
 Ссылка: @${callbackQuery.message.chat.username}
 `);
 
-        setTimeout(() => {
-          const status = getCurrentStatus(callbackQuery.message.chat.id);
-
-          if (status && status === "finished") {
-            toStatus(
-              chatId,
-              newMessageFinalID.message_id,
-              "communicate_manager",
-              callbackQuery.message.chat.first_name,
-              callbackQuery.message.chat.last_name,
-              callbackQuery.message.chat.username
-            );
-          }
-        }, 60000);
-        break;
-
-      case "communicate_manager":
-        await wrapPromise(() =>
-          bot.sendMessage(chatId, communicationManagerlMessage, {
-            reply_markup: {
-              inline_keyboard: [[callManager]],
-            },
-          })
-        );
-
-        await clearKeyBoard(chatId, messageId, [[callManager]]);
-
-        writeUsernameToFile(
-          callbackQuery.message.chat.id,
-          "communicate_manager"
-        );
-
-        sendToChannel(`💬 ЗАПРОС НА ОБЩЕНИЕ 💬
-  
-ID: ${callbackQuery.message.chat.id}
-Имя: ${callbackQuery.message.chat.first_name} ${
-          callbackQuery.message.chat.last_name
-            ? callbackQuery.message.chat.last_name
-            : ""
-        }
-Ссылка: @${callbackQuery.message.chat.username}
-  `);
         break;
 
       case "communicate_call":
@@ -483,9 +432,7 @@ ID: ${callbackQuery.message.chat.id}
             messageId,
             `Спасибо, вы записаны на ${parsedCallbackData.date} в ${parsedCallbackData.time}.
 
-В скором времени специалист свяжется с вами и постарается сделать все возможное, чтобы встреча состоялась именно в это время.
-
-Если Вы хотите ускорить данный процесс, просто напишите нашему специалисту - @nazar_mlc.`
+В скором времени наш специалист свяжется с Вами для подтверждения встречи.`
           );
           writeUsernameToFile(
             callbackQuery.message.chat.id,
