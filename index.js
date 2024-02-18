@@ -210,7 +210,7 @@ const sendVideoToUser = async (chatId, filename, inlineKeyboard) => {
 
 const sendToChannel = async (messageText) => {
   try {
-    const channelInfo = await bot.getChat("@autoaicheck");
+    const channelInfo = await bot.getChat("@autoaicheck"); 
     await wrapPromise(() =>
       bot.sendMessage(channelInfo.id, messageText, {
         parse_mode: "HTML",
@@ -231,7 +231,7 @@ const readUsernamesFromFile = () => {
   }
 };
 
-const writeUsernameToFile = (id, status) => {
+const writeUsernameToFile = (id, status, addedInfo={}) => {
   const users = readUsernamesFromFile();
 
   const existingUserIndex = users.findIndex((user) => user.id === id);
@@ -240,7 +240,7 @@ const writeUsernameToFile = (id, status) => {
     users[existingUserIndex].status = status;
     users[existingUserIndex].dateUpdated = new Date();
   } else {
-    users.push({ id, status, dateCreated: new Date() });
+    users.push({ id, status, dateCreated: new Date(), ...addedInfo});
   }
 
   try {
@@ -264,7 +264,15 @@ const getCurrentStatus = (id) => {
 
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id,
-    userFirstName = msg.chat.first_name;
+    userFirstName = msg.chat.first_name
+	let bio
+	try{
+		const {bio: chatBio} = await bot.getChat(chatId)
+		bio = chatBio;
+	}catch(e){
+		console.log(`Error: ${e.message}`)
+	}
+
 
   try {
     const hiMessage = `Привет, ${userFirstName}!
@@ -278,7 +286,7 @@ bot.onText(/\/start/, async (msg) => {
     const channelMessage = `🚀 ЗАПУСК ВОРОНКИ 🚀
   
 ID: ${msg.chat.id}
-Имя: ${msg.chat.first_name} ${msg.chat.last_name ? msg.chat.last_name : ""}
+Имя: ${msg.chat.first_name} ${msg.chat.last_name ? msg.chat.last_name : ""}${(bio) ? `\nОписание: ${bio}` : ''}
 Ссылка: @${msg.chat.username}`;
 
     await wrapPromise(() => bot.sendMessage(chatId, hiMessage));
@@ -291,7 +299,7 @@ ID: ${msg.chat.id}
     );
 
     sendToChannel(channelMessage);
-    writeUsernameToFile(msg.chat.id, "started");
+    writeUsernameToFile(msg.chat.id, "started", {firstName: msg.chat.first_name, lastName: msg.chat.last_name, userName: msg.chat.username, bio});
 
     setTimeout(() => {
       const status = getCurrentStatus(msg.chat.id);
@@ -307,7 +315,7 @@ ID: ${msg.chat.id}
         );
       }
     }, 120000);
-  } catch {
+  } catch (error){
     console.error("Ошибка отправки /start:", error.message);
   }
 });
